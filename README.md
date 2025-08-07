@@ -1,6 +1,3 @@
-# orac_embedded_client
-An ultra-lean, high-performance API written in Assembly for connecting IoT devices to the ORAC AGI agentic AI. Built for resource-constrained, embedded Linux systems.
-
 # ORAC Embedded Client
 
 An ultra-lean, high-performance API for connecting resource-constrained IoT devices to the ORAC AGI agentic AI. This project is meticulously engineered in Assembly for maximum efficiency, a minimal footprint, and direct control over the hardware and network stack on embedded Linux systems.
