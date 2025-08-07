@@ -1,0 +1,36 @@
+# Makefile for ORAC Embedded Client
+
+# Compiler and assembler
+CC = gcc
+AS = as
+LD = gcc
+
+# Files
+SRC_C = main.c
+SRC_S = orac_api.s
+OBJ_C = main.o
+OBJ_S = orac_api.o
+TARGET = orac_client
+
+# Flags
+CFLAGS = -Wall -O2 -nostdlib -fno-pie -no-pie
+ASFLAGS = --32
+LDFLAGS = -static -nostartfiles
+
+# Default target
+all: $(TARGET)
+
+$(OBJ_S): $(SRC_S)
+	$(AS) $(ASFLAGS) -o $@ $<
+
+$(OBJ_C): $(SRC_C)
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+$(TARGET): $(OBJ_S) $(OBJ_C)
+	$(LD) $(LDFLAGS) -o $@ $^
+
+# Clean build artifacts
+clean:
+	rm -f *.o $(TARGET)
+
+.PHONY: all clean
