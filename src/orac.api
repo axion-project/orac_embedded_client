@@ -1,0 +1,112 @@
+;--------------------------------------------------------------------------------------
+; ORAC Embedded API: Conceptual Assembly for Embedded Linux IoT (x86-64)
+; File: orac_api
+;
+; This code defines an embedded API for connecting to ORAC via TCP/IP sockets.
+; It demonstrates the use of Linux syscalls for network communication.
+; This is a high-level conceptual model, not a complete, runnable library.
+;--------------------------------------------------------------------------------------
+
+section .data
+    orac_ip_addr  db  "192.168.1.100", 0   ; IP address of ORAC server
+    orac_port     dw  8080                 ; Port number
+
+    socket_fd     dq  0                    ; File descriptor for the socket
+    
+    ; Define request and response message formats based on ORAC's custom protocol.
+    ; For this example, let's assume a simple binary message structure:
+    ; [2 bytes: msg_type] [4 bytes: payload_len] [N bytes: payload]
+    request_msg   db  0x01, 0x00, 0x00, 0x00, 0x04, 0xDE, 0xAD, 0xBE, 0xEF  ; Example message
+    request_len   equ $ - request_msg
+    
+    response_buffer   resb 1024            ; Buffer to hold the response
+    
+section .text
+    global connect_orac
+    global send_orac_message
+    global receive_orac_response
+    global close_orac
+
+; ----------------------------------------------------------------------------------
+; Function: connect_orac
+; Purpose:  Establishes a TCP connection to the ORAC server.
+; Returns:  RAX = 0 on success, -1 on failure.
+; C calling convention: Not strictly followed, this is for internal use.
+; ----------------------------------------------------------------------------------
+connect_orac:
+    ; Create a socket: syscall 41 (socket)
+    mov     rax, 41
+    mov     rdi, 2               ; AF_INET (IPv4)
+    mov     rsi, 1               ; SOCK_STREAM (TCP)
+    mov     rdx, 0               ; Protocol (IP)
+    syscall
+    cmp     rax, 0
+    jl      .error_connect
+    mov     [socket_fd], rax     ; Save the socket file descriptor
+
+    ; Prepare socket address structure (sockaddr_in)
+    ; struct sockaddr_in {
+    ;     short   sin_family;  (AF_INET)
+    ;     u_short sin_port;    (port in network byte order)
+    ;     struct  in_addr sin_addr; (IP address)
+    ;     char    sin_zero[8]; (padding)
+    ; }
+    mov     word [rsp-16], 2           ; sin_family = AF_INET (2)
+    mov     ax, [orac_port]
+    xchg    al, ah                     ; Convert port to network byte order (big-endian)
+    mov     word [rsp-14], ax          ; sin_port
+    ; --- NOTE: A real implementation would parse the IP string into an integer here. ---
+    mov     dword [rsp-12], 0x6401A8C0 ; sin_addr.s_addr (example: 192.168.1.100)
+    
+    ; Connect to the server: syscall 42 (connect)
+    mov     rax, 42
+    mov     rdi, [socket_fd]           ; Socket file descriptor
+    mov     rsi, rsp-16                ; Pointer to sockaddr_in struct
+    mov     rdx, 16                    ; Size of struct
+    syscall
+    cmp     rax, 0
+    jl      .error_connect
+    
+    xor     rax, rax                   ; Return 0 for success
+    ret
+
+.error_connect:
+    mov     rax, -1                    ; Return -1 for failure
+    ret
+
+; ----------------------------------------------------------------------------------
+; Function: send_orac_message
+; Purpose:  Sends a predefined request message to ORAC.
+; Returns:  RAX = bytes sent on success, -1 on failure.
+; ----------------------------------------------------------------------------------
+send_orac_message:
+    mov     rax, 1                     ; syscall 1 (write)
+    mov     rdi, [socket_fd]           ; Socket file descriptor
+    mov     rsi, request_msg           ; Pointer to the message
+    mov     rdx, request_len           ; Length of the message
+    syscall
+    ret
+
+; ----------------------------------------------------------------------------------
+; Function: receive_orac_response
+; Purpose:  Receives a response from ORAC.
+; Returns:  RAX = bytes received on success, -1 on failure.
+; ----------------------------------------------------------------------------------
+receive_orac_response:
+    mov     rax, 0                     ; syscall 0 (read)
+    mov     rdi, [socket_fd]           ; Socket file descriptor
+    mov     rsi, response_buffer       ; Buffer to store the response
+    mov     rdx, 1024                  ; Max length of the response buffer
+    syscall
+    ret
+
+; ----------------------------------------------------------------------------------
+; Function: close_orac
+; Purpose:  Closes the TCP connection.
+; Returns:  RAX = 0 on success, -1 on failure.
+; ----------------------------------------------------------------------------------
+close_orac:
+    mov     rax, 3                     ; syscall 3 (close)
+    mov     rdi, [socket_fd]           ; Socket file descriptor
+    syscall
+    ret
